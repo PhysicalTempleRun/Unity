@@ -1,0 +1,4 @@
+repository "TempleRunFromScratch@seojinseojin@cloud"
+  path "/"
+    br "/main"
+    co "/main"
