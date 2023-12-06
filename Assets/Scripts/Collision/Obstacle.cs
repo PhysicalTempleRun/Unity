@@ -7,6 +7,7 @@ public class Obstacle : MonoBehaviour
     public AudioSource collisionFX;
     public GameObject player;
     public GameObject charModel;
+    public GameObject LevelControl;
 
     void OnTriggerEnter(Collider other)
     {
@@ -14,5 +15,6 @@ public class Obstacle : MonoBehaviour
         this.gameObject.GetComponent<BoxCollider>().enabled = false;
         player.GetComponent<PlayerMove>().enabled = false;
         charModel.GetComponent<Animator>().Play("Stumble Backwards");
+        LevelControl.GetComponent<IncreaseDistance>().isGameRunning = false;
     }
 }
