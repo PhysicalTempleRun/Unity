@@ -23938,6 +23938,7 @@ MonoBehaviour:
   moveSpeed: 20
   leftRightSpeed: 25
   jump: 20
+  rotateDuration: 0.05
 --- !u!65 &2123276570
 BoxCollider:
   m_ObjectHideFlags: 0
