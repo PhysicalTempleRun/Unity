@@ -9,6 +9,7 @@ public class IncreaseDistance : MonoBehaviour
     public GameObject finalScoreDisplay;
     public GameObject scoreboard;
     public int disRun;
+    public bool isPlayerRunning = false;
     public bool isGameRunning = true;
     public bool increasingDistance = false;
 
@@ -19,9 +20,8 @@ public class IncreaseDistance : MonoBehaviour
 
     // Update is called once per frame
     void Update()
-    {
-        
-        if(isGameRunning && increasingDistance==false) {
+    {   
+        if(isGameRunning && increasingDistance==false && isPlayerRunning==true) {
             increasingDistance=true;
             StartCoroutine(AddingDis());
         }

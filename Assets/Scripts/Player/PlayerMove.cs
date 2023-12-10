@@ -5,6 +5,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Threading;
 
+/*
 public class PlayerMove : MonoBehaviour
 {
     SerialPort serialPortUSB;
@@ -21,7 +22,7 @@ public class PlayerMove : MonoBehaviour
     public float jump = 20;
     private bool isJumping = false;
     private bool isComingDown= false;
-    private bool isRunning = true;
+    public bool isRunning = true;
     public float rotateDuration = 0.05f;
 
     private Thread usbThread;
@@ -31,6 +32,8 @@ public class PlayerMove : MonoBehaviour
 
     private Queue<string> usbQueue = new Queue<string>();
     private Queue<string> bltQueue = new Queue<string>();
+    
+    public GameObject levelControl;
 
 
     void Start() {
@@ -174,6 +177,7 @@ public class PlayerMove : MonoBehaviour
             if(isRunning) {
                 isRunning=false;
                 charModel.GetComponent<Animator>().Play("Idle");
+                levelControl.GetComponent<IncreaseDistance>().isPlayerRunning = false;
             }
         } else if(isSubsequence(msg, "start")) {
             if(!isRunning) {
@@ -242,8 +246,9 @@ public class PlayerMove : MonoBehaviour
     }
 
 }
+*/
 
-/*
+
 
 public class PlayerMove : MonoBehaviour
 {
@@ -253,25 +258,37 @@ public class PlayerMove : MonoBehaviour
     public float jump = 20;
     private bool isJumping = false;
     private bool isComingDown= false;
+    private bool isRunning = false;
 
     public float rotateDuration = 0.05f;
+    public GameObject levelControl;
 
 
     // Update is called once per frame
     void Update()
     {
-        transform.Translate(Vector3.forward*moveSpeed*Time.deltaTime);
-        if (!isRotating)
-        {
-            if (Input.GetKeyDown(KeyCode.LeftArrow))
-            {
-                StartCoroutine(Rotate(Quaternion.Euler(0, -90, 0)));
-            }
-            else if (Input.GetKeyDown(KeyCode.RightArrow))
-            {
-                StartCoroutine(Rotate(Quaternion.Euler(0, 90, 0)));
-            }
+        if(isRunning) {
+            transform.Translate(Vector3.forward*moveSpeed*Time.deltaTime);
         }
+        
+
+        if (Input.GetKeyDown(KeyCode.LeftArrow))
+        {
+            StartCoroutine(Rotate(Quaternion.Euler(0, -90, 0)));
+        }
+        else if (Input.GetKeyDown(KeyCode.RightArrow))
+        {
+            StartCoroutine(Rotate(Quaternion.Euler(0, 90, 0)));
+        }
+        if(Input.GetKey(KeyCode.B)) {
+            isRunning = true;
+            levelControl.GetComponent<IncreaseDistance>().isPlayerRunning = true;
+        }
+        if(Input.GetKey(KeyCode.N)) {
+            isRunning = false;
+            levelControl.GetComponent<IncreaseDistance>().isPlayerRunning = false;
+        }
+        
 
         if(Input.GetKey(KeyCode.W) || Input.GetKey(KeyCode.UpArrow))
         {
@@ -298,7 +315,7 @@ public class PlayerMove : MonoBehaviour
     IEnumerator JumpSequence() {
         yield return new WaitForSeconds(0.6f);
         isComingDown = true;
-        yield return new WaitForSeconds(0.6f);
+        yield return new WaitForSeconds(0.611f);
         isComingDown = false;
         isJumping = false;
         charModel.GetComponent<Animator>().Play("Standard Run");
@@ -306,8 +323,6 @@ public class PlayerMove : MonoBehaviour
 
     IEnumerator Rotate(Quaternion deltaRotation)
     {
-        isRotating = true;
-
         Quaternion originalRotation = transform.rotation;
         Quaternion targetRotation = transform.rotation * deltaRotation;
 
@@ -318,8 +333,6 @@ public class PlayerMove : MonoBehaviour
         }
 
         transform.rotation = targetRotation;
-        isRotating = false;
     }
     
 }
-*/
