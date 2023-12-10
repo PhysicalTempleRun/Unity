@@ -4,7 +4,6 @@ using System.IO.Ports;
 using System.Collections;
 using System.Collections.Generic;
 using System.Threading;
-using ArduinoBluetoothAPI;
 
 public class PlayerMove : MonoBehaviour
 {
@@ -12,7 +11,6 @@ public class PlayerMove : MonoBehaviour
     string portNameUSB = "/dev/cu.usbmodem141101";
     int baudRateUSB = 9600;
     
-    BluetoothHelper bluetoothHelper;
     SerialPort serialPortBLT;
     string portNameBLT = "/dev/cu.usbmodem141401";////"/dev/cu.usbmodem142401"; //"/dev/cu.MyBT2";
     int baudRateBLT = 9600;
@@ -58,36 +56,11 @@ public class PlayerMove : MonoBehaviour
             bltThread = new Thread(ReadBLT);
             bltThread.Start();
             isReadingBLT = true;
-            // BluetoothHelper.SERIAL_COMM = true; // 시리얼 통신 사용 설정
-            // bluetoothHelper = BluetoothHelper.GetInstance(portNameBLT);
-            // bluetoothHelper.OnConnected += OnConnected;
-            // bluetoothHelper.OnConnectionFailed += OnConnectionFailed;
-            // bluetoothHelper.OnDataReceived += OnDataReceived;
-            // bluetoothHelper.Connect();
         }
         catch (Exception ex) {
             Debug.LogError("Error opening Bluetooth port: " + ex.Message);
         }
     }
-
-    // void OnConnected(BluetoothHelper helper)
-    // {
-    //     Debug.Log("Connected to Bluetooth device");
-    //     isReadingBLT = true;
-    // }
-
-    // void OnConnectionFailed(BluetoothHelper helper)
-    // {
-    //     Debug.LogError("Connection to Bluetooth device failed");
-    // }
-
-    // void OnDataReceived(BluetoothHelper helper)
-    // {
-    //     if (!isReadingBLT) return;
-
-    //     string message = helper.Read();
-    //     HandleMessageBluetooth(message);
-    // }
     
     void Update()
     {
@@ -139,8 +112,6 @@ public class PlayerMove : MonoBehaviour
             serialPortUSB.Close();
         if (serialPortBLT != null && serialPortBLT.IsOpen)
             serialPortBLT.Close();
-        if (bluetoothHelper != null)
-            bluetoothHelper.Disconnect();
     }
 
     private void ReadUSB()
