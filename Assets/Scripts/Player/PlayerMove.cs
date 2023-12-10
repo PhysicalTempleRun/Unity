@@ -1,14 +1,21 @@
+using UnityEngine;
+using System;
 using System.IO.Ports;
 using System.Collections;
 using System.Collections.Generic;
-using UnityEngine;
+using System.Threading;
+using ArduinoBluetoothAPI;
 
-/*
 public class PlayerMove : MonoBehaviour
 {
-    SerialPort serialPort;
-    string portName = "/dev/cu.usbmodem142101"; // Change to your Arduino's port
-    int baudRate = 9600;
+    SerialPort serialPortUSB;
+    string portNameUSB = "/dev/cu.usbmodem141101";
+    int baudRateUSB = 9600;
+    
+    BluetoothHelper bluetoothHelper;
+    SerialPort serialPortBLT;
+    string portNameBLT = "/dev/cu.usbmodem141401";////"/dev/cu.usbmodem142401"; //"/dev/cu.MyBT2";
+    int baudRateBLT = 9600;
 
     public GameObject charModel;
     public float moveSpeed = 20;
@@ -17,24 +24,95 @@ public class PlayerMove : MonoBehaviour
     private bool isJumping = false;
     private bool isComingDown= false;
     private bool isRunning = true;
+    public float rotateDuration = 0.05f;
+
+    private Thread usbThread;
+    private Thread bltThread;
+    private bool isReadingUSB = false;
+    private bool isReadingBLT = false;
+
+    private Queue<string> usbQueue = new Queue<string>();
+    private Queue<string> bltQueue = new Queue<string>();
+
 
     void Start() {
-        serialPort = new SerialPort(portName, baudRate);
-        serialPort.Open();
+        try {
+            serialPortUSB = new SerialPort(portNameUSB, baudRateUSB);
+            serialPortUSB.Open();
+            Debug.Log("USB Port Opened");
+            usbThread = new Thread(ReadUSB);
+            usbThread.Start();
+            isReadingUSB = true;
+        }
+        catch (Exception ex) {
+            Debug.LogError("Error opening USB port: " + ex.Message);
+        }
+
+        try {
+            Debug.Log("Bluetooth Port Opening");
+            serialPortBLT = new SerialPort(portNameBLT, baudRateBLT);
+            serialPortBLT.Open();
+            serialPortBLT.DtrEnable = true;
+            serialPortBLT.ReadTimeout = 100;
+            Debug.Log("Bluetooth Port Opened");
+            bltThread = new Thread(ReadBLT);
+            bltThread.Start();
+            isReadingBLT = true;
+            // BluetoothHelper.SERIAL_COMM = true; // 시리얼 통신 사용 설정
+            // bluetoothHelper = BluetoothHelper.GetInstance(portNameBLT);
+            // bluetoothHelper.OnConnected += OnConnected;
+            // bluetoothHelper.OnConnectionFailed += OnConnectionFailed;
+            // bluetoothHelper.OnDataReceived += OnDataReceived;
+            // bluetoothHelper.Connect();
+        }
+        catch (Exception ex) {
+            Debug.LogError("Error opening Bluetooth port: " + ex.Message);
+        }
     }
+
+    // void OnConnected(BluetoothHelper helper)
+    // {
+    //     Debug.Log("Connected to Bluetooth device");
+    //     isReadingBLT = true;
+    // }
+
+    // void OnConnectionFailed(BluetoothHelper helper)
+    // {
+    //     Debug.LogError("Connection to Bluetooth device failed");
+    // }
+
+    // void OnDataReceived(BluetoothHelper helper)
+    // {
+    //     if (!isReadingBLT) return;
+
+    //     string message = helper.Read();
+    //     HandleMessageBluetooth(message);
+    // }
     
-    // Update is called once per frame
     void Update()
     {
         if(isRunning) {
             transform.Translate(Vector3.forward*moveSpeed*Time.deltaTime);
         }
 
-        if (serialPort.IsOpen) {
-            try {
-                string message = serialPort.ReadLine();
-                HandleMessage(message);
-            } catch (System.Exception) { }
+        while (usbQueue.Count > 0)
+        {
+            string message = "";
+            lock (usbQueue)
+            {
+                message = usbQueue.Dequeue();
+            }
+            HandleMessageUSB(message);
+        }
+
+        while (bltQueue.Count > 0)
+        {
+            string message = "";
+            lock (bltQueue)
+            {
+                message = bltQueue.Dequeue();
+            }
+            HandleMessageBluetooth(message);
         }
         
         if(isJumping==true) {
@@ -46,25 +124,102 @@ public class PlayerMove : MonoBehaviour
         }
     }
 
-    void HandleMessage(string message) {
-        switch (message.Trim()) {
-            case "jump":
-                if(!isJumping)
+    void OnDestroy()
+    {
+        // 스레드 종료 처리
+        isReadingUSB = false;
+        isReadingBLT = false;
+        if (usbThread != null && usbThread.IsAlive)
+            usbThread.Join();
+        if (bltThread != null && bltThread.IsAlive)
+            bltThread.Join();
+
+        // 시리얼 포트 닫기
+        if (serialPortUSB != null && serialPortUSB.IsOpen)
+            serialPortUSB.Close();
+        if (serialPortBLT != null && serialPortBLT.IsOpen)
+            serialPortBLT.Close();
+        if (bluetoothHelper != null)
+            bluetoothHelper.Disconnect();
+    }
+
+    private void ReadUSB()
+    {
+        while (isReadingUSB)
+        {
+            try
+            {
+                if (serialPortUSB.IsOpen)
                 {
-                    Jump();
+                    string message = serialPortUSB.ReadLine();
+                    lock (usbQueue)
+                    {
+                        usbQueue.Enqueue(message);
+                    }
                 }
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError("USB Read Thread Error: " + ex.Message);
+            }
+        }
+    }
+
+    private void ReadBLT()
+    {
+        while (isReadingBLT)
+        {
+            try
+            {
+                if (serialPortBLT.IsOpen)
+                {
+                    string message = serialPortBLT.ReadLine();
+                    lock (bltQueue)
+                    {
+                        bltQueue.Enqueue(message);
+                    }
+                }
+            }
+            catch (TimeoutException)
+            {
+                // Timeout 처리
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError("BLT Read Thread Error: " + ex.Message);
+            }
+        }
+    }
+
+    void HandleMessageUSB(string message) {
+        Debug.Log("USB Message: " + message);
+        string msg = message.Trim();
+        if(isSubsequence(msg, "jump")) {
+            if(!isJumping)
+            {
+                Jump();
+            }
+        } else if(isSubsequence(msg, "stop")) {
+            if(isRunning) {
+                isRunning=false;
+                charModel.GetComponent<Animator>().Play("Idle");
+            }
+        } else if(isSubsequence(msg, "start")) {
+            if(!isRunning) {
+                isRunning=true;
+                charModel.GetComponent<Animator>().Play("Standard Run");
+            }
+        } 
+    }
+
+    void HandleMessageBluetooth(string message) {
+        Debug.Log("Bluetooth Message: " + message);
+        switch (message.Trim()) {
+            case "left":
+                StartCoroutine(Rotate(Quaternion.Euler(0, -90, 0)));
                 break;
-            case "stop":
-                if(isRunning) {
-                    isRunning=false;
-                    charModel.GetComponent<Animator>().Play("Idle");
-                }
-                break;
-            case "start":
-                if(!isRunning) {
-                    isRunning=true;
-                    charModel.GetComponent<Animator>().Play("Standard Run");
-                }
+            case "right":
+                StartCoroutine(Rotate(Quaternion.Euler(0, 90, 0)));
                 break;
         }
     }
@@ -83,9 +238,41 @@ public class PlayerMove : MonoBehaviour
         isJumping = false;
         charModel.GetComponent<Animator>().Play("Standard Run");
     }
-}
-*/
 
+    IEnumerator Rotate(Quaternion deltaRotation)
+    {
+        Quaternion originalRotation = transform.rotation;
+        Quaternion targetRotation = transform.rotation * deltaRotation;
+
+        for (float t = 0; t < 1; t += Time.deltaTime / rotateDuration)
+        {
+            transform.rotation = Quaternion.Lerp(originalRotation, targetRotation, t);
+            yield return null;
+        }
+
+        transform.rotation = targetRotation;
+    }
+
+    private bool isSubsequence(string source, string target)
+    {
+        int sourceIndex = 0;
+        int targetIndex = 0;
+
+        while (sourceIndex < source.Length && targetIndex < target.Length)
+        {
+            if (source[sourceIndex] == target[targetIndex])
+            {
+                targetIndex++;
+            }
+            sourceIndex++;
+        }
+
+        return targetIndex == target.Length;
+    }
+
+}
+
+/*
 
 public class PlayerMove : MonoBehaviour
 {
@@ -96,7 +283,6 @@ public class PlayerMove : MonoBehaviour
     private bool isJumping = false;
     private bool isComingDown= false;
 
-    private bool isRotating = false;
     public float rotateDuration = 0.05f;
 
 
@@ -165,3 +351,4 @@ public class PlayerMove : MonoBehaviour
     }
     
 }
+*/
