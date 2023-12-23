@@ -56,5 +56,5 @@
 
 
 ## Reference
-|HOW TO MAKE A 3D ENDLESS RUNNER GAME IN UNITY FOR PC & MOBILE by [Jimmy Vegas](https://www.youtube.com/@JimmyVegasUnity)| https://www.youtube.com/watch?v=u5hRtTEhnOA&list=PLZ1b66Z1KFKit4cSry_LWBisrSbVkEF4t |
-|--|--|
+
+* [HOW TO MAKE A 3D ENDLESS RUNNER GAME IN UNITY FOR PC & MOBILE](https://www.youtube.com/watch?v=u5hRtTEhnOA&list=PLZ1b66Z1KFKit4cSry_LWBisrSbVkEF4t) by [Jimmy Vegas](https://www.youtube.com/@JimmyVegasUnity)
