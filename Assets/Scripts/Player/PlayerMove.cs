@@ -4,8 +4,9 @@ using System.IO.Ports;
 using System.Collections;
 using System.Collections.Generic;
 using System.Threading;
+using UnityEngine.SceneManagement;
 
-/*
+
 public class PlayerMove : MonoBehaviour
 {
     SerialPort serialPortUSB;
@@ -14,7 +15,7 @@ public class PlayerMove : MonoBehaviour
     
     SerialPort serialPortBLT;
     string portNameBLT = "/dev/cu.usbmodem141401";////"/dev/cu.usbmodem142401"; //"/dev/cu.MyBT2";
-    int baudRateBLT = 9600;
+    int baudRateBLT = 115200;
 
     public GameObject charModel;
     public float moveSpeed = 20;
@@ -22,7 +23,7 @@ public class PlayerMove : MonoBehaviour
     public float jump = 20;
     private bool isJumping = false;
     private bool isComingDown= false;
-    public bool isRunning = true;
+    public bool isRunning = false;
     public float rotateDuration = 0.05f;
 
     private Thread usbThread;
@@ -32,38 +33,19 @@ public class PlayerMove : MonoBehaviour
 
     private Queue<string> usbQueue = new Queue<string>();
     private Queue<string> bltQueue = new Queue<string>();
+
+    private Coroutine rotateCoroutine;
+    private Coroutine jumpCoroutine;
     
     public GameObject levelControl;
 
 
-    void Start() {
-        try {
-            serialPortUSB = new SerialPort(portNameUSB, baudRateUSB);
-            serialPortUSB.Open();
-            Debug.Log("USB Port Opened");
-            usbThread = new Thread(ReadUSB);
-            usbThread.Start();
-            isReadingUSB = true;
-        }
-        catch (Exception ex) {
-            Debug.LogError("Error opening USB port: " + ex.Message);
-        }
-
-        try {
-            Debug.Log("Bluetooth Port Opening");
-            serialPortBLT = new SerialPort(portNameBLT, baudRateBLT);
-            serialPortBLT.Open();
-            serialPortBLT.DtrEnable = true;
-            serialPortBLT.ReadTimeout = 100;
-            Debug.Log("Bluetooth Port Opened");
-            bltThread = new Thread(ReadBLT);
-            bltThread.Start();
-            isReadingBLT = true;
-        }
-        catch (Exception ex) {
-            Debug.LogError("Error opening Bluetooth port: " + ex.Message);
-        }
-    }
+    // void Start() {
+    //     Debug.Log("PlayerMove.cs : Start() called");
+    //     isRunning=false;
+    //     charModel.GetComponent<Animator>().Play("Idle");
+    //     levelControl.GetComponent<IncreaseDistance>().isPlayerRunning = false;
+    // }
     
     void Update()
     {
@@ -100,25 +82,55 @@ public class PlayerMove : MonoBehaviour
         }
     }
 
-    void OnDestroy()
-    {
+
+    void OnApplicationPause() {
+        Debug.Log("PlayerMove.cs : OnApplicationPause() called");
+        //CleanUpResources();
+    }
+
+    void OnDestroy() {
+        Debug.Log("PlayerMove.cs : OnDestroy() called");
+        CleanUpResources();
+    }
+
+    private void CleanUpResources() {
+        
+        Debug.Log("Cleaning up resources...");
+
+        // if (rotateCoroutine != null) {
+        //     Debug.Log("rotate coroutine stopped");
+        //     StopCoroutine(rotateCoroutine);
+        // }
+        // if (jumpCoroutine != null) {
+        //     Debug.Log("jump coroutine stopped");
+        //     StopCoroutine(jumpCoroutine);
+        // }
+        // 시리얼 포트 닫기
+        if (serialPortUSB != null && serialPortUSB.IsOpen) {
+            Debug.Log("USB Port Closed");
+            serialPortUSB.Close();
+        }
+        if (serialPortBLT != null && serialPortBLT.IsOpen) {
+            Debug.Log("Bluetooth Port Closed"); 
+            serialPortBLT.Close();
+        }
+
         // 스레드 종료 처리
         isReadingUSB = false;
         isReadingBLT = false;
-        if (usbThread != null && usbThread.IsAlive)
-            usbThread.Join();
-        if (bltThread != null && bltThread.IsAlive)
-            bltThread.Join();
-
-        // 시리얼 포트 닫기
-        if (serialPortUSB != null && serialPortUSB.IsOpen)
-            serialPortUSB.Close();
-        if (serialPortBLT != null && serialPortBLT.IsOpen)
-            serialPortBLT.Close();
+        if (usbThread != null && usbThread.IsAlive) {
+            Debug.Log("USB Thread Close");
+            usbThread.Abort();
+        }
+        if (bltThread != null && bltThread.IsAlive) {
+            Debug.Log("Bluetooth Thread Close");
+            bltThread.Abort();
+        }
     }
 
     private void ReadUSB()
     {
+        Debug.Log("ReadUSB() called");
         while (isReadingUSB)
         {
             try
@@ -128,6 +140,7 @@ public class PlayerMove : MonoBehaviour
                     string message = serialPortUSB.ReadLine();
                     lock (usbQueue)
                     {
+                        Debug.Log("1 - USB Message: " + message);
                         usbQueue.Enqueue(message);
                     }
                 }
@@ -137,10 +150,12 @@ public class PlayerMove : MonoBehaviour
                 Debug.LogError("USB Read Thread Error: " + ex.Message);
             }
         }
+        Debug.Log("ReadUSB() closed");
     }
 
     private void ReadBLT()
     {
+        Debug.Log("ReadBLT() called");
         while (isReadingBLT)
         {
             try
@@ -150,19 +165,17 @@ public class PlayerMove : MonoBehaviour
                     string message = serialPortBLT.ReadLine();
                     lock (bltQueue)
                     {
+                        Debug.Log("1 - BLT Message: " + message);
                         bltQueue.Enqueue(message);
                     }
                 }
-            }
-            catch (TimeoutException)
-            {
-                // Timeout 처리
             }
             catch (Exception ex)
             {
                 Debug.LogError("BLT Read Thread Error: " + ex.Message);
             }
         }
+        Debug.Log("ReadBLT() closed");
     }
 
     void HandleMessageUSB(string message) {
@@ -183,18 +196,19 @@ public class PlayerMove : MonoBehaviour
             if(!isRunning) {
                 isRunning=true;
                 charModel.GetComponent<Animator>().Play("Standard Run");
+                levelControl.GetComponent<IncreaseDistance>().isPlayerRunning = true;
             }
-        } 
+        }
     }
 
     void HandleMessageBluetooth(string message) {
         Debug.Log("Bluetooth Message: " + message);
         switch (message.Trim()) {
             case "left":
-                StartCoroutine(Rotate(Quaternion.Euler(0, -90, 0)));
+                rotateCoroutine = StartCoroutine(Rotate(Quaternion.Euler(0, -90, 0)));
                 break;
             case "right":
-                StartCoroutine(Rotate(Quaternion.Euler(0, 90, 0)));
+                rotateCoroutine = StartCoroutine(Rotate(Quaternion.Euler(0, 90, 0)));
                 break;
         }
     }
@@ -202,16 +216,17 @@ public class PlayerMove : MonoBehaviour
     void Jump(){
         isJumping = true;
         charModel.GetComponent<Animator>().Play("Jump");
-        StartCoroutine(JumpSequence());
+        jumpCoroutine = StartCoroutine(JumpSequence());
     }
 
     IEnumerator JumpSequence() {
         yield return new WaitForSeconds(0.6f);
         isComingDown = true;
-        yield return new WaitForSeconds(0.6f);
+        yield return new WaitForSeconds(0.611f);
         isComingDown = false;
         isJumping = false;
         charModel.GetComponent<Animator>().Play("Standard Run");
+        jumpCoroutine = null;
     }
 
     IEnumerator Rotate(Quaternion deltaRotation)
@@ -226,6 +241,7 @@ public class PlayerMove : MonoBehaviour
         }
 
         transform.rotation = targetRotation;
+        rotateCoroutine = null; 
     }
 
     private bool isSubsequence(string source, string target)
@@ -245,94 +261,49 @@ public class PlayerMove : MonoBehaviour
         return targetIndex == target.Length;
     }
 
-}
-*/
-
-
-
-public class PlayerMove : MonoBehaviour
-{
-    public GameObject charModel;
-    public float moveSpeed = 20;
-    public float leftRightSpeed = 25;
-    public float jump = 20;
-    private bool isJumping = false;
-    private bool isComingDown= false;
-    private bool isRunning = false;
-
-    public float rotateDuration = 0.05f;
-    public GameObject levelControl;
-
-
-    // Update is called once per frame
-    void Update()
-    {
-        if(isRunning) {
-            transform.Translate(Vector3.forward*moveSpeed*Time.deltaTime);
-        }
-        
-
-        if (Input.GetKeyDown(KeyCode.LeftArrow))
-        {
-            StartCoroutine(Rotate(Quaternion.Euler(0, -90, 0)));
-        }
-        else if (Input.GetKeyDown(KeyCode.RightArrow))
-        {
-            StartCoroutine(Rotate(Quaternion.Euler(0, 90, 0)));
-        }
-        if(Input.GetKey(KeyCode.B)) {
-            isRunning = true;
-            levelControl.GetComponent<IncreaseDistance>().isPlayerRunning = true;
-        }
-        if(Input.GetKey(KeyCode.N)) {
-            isRunning = false;
-            levelControl.GetComponent<IncreaseDistance>().isPlayerRunning = false;
-        }
-        
-
-        if(Input.GetKey(KeyCode.W) || Input.GetKey(KeyCode.UpArrow))
-        {
-            if(!isJumping)
-            {
-                Jump();
+    void Start() {
+        Debug.Log("PlayerMove.cs : OnStart() called");
+        isRunning=false;
+        charModel.GetComponent<Animator>().Play("Idle");
+        levelControl.GetComponent<IncreaseDistance>().isPlayerRunning = false;
+        // USB 시리얼 포트 재연결 시도
+        if (serialPortUSB == null || !serialPortUSB.IsOpen) {
+            try {
+                serialPortUSB = new SerialPort(portNameUSB, baudRateUSB);
+                serialPortUSB.Open();
+                Debug.Log("USB Port Reopened");
+            }
+            catch (Exception ex) {
+                Debug.LogError("Error reopening USB port: " + ex.Message);
             }
         }
-        if(isJumping==true) {
-            if(isComingDown==false) {
-                transform.Translate(Vector3.up*Time.deltaTime*jump,Space.World);
-            } else {
-                transform.Translate(Vector3.down*Time.deltaTime*jump,Space.World);
+
+        // Bluetooth 시리얼 포트 재연결 시도
+        if (serialPortBLT == null || !serialPortBLT.IsOpen) {
+            try {
+                serialPortBLT = new SerialPort(portNameBLT, baudRateBLT);
+                serialPortBLT.Open();
+                Debug.Log("Bluetooth Port Reopened");
+            }
+            catch (Exception ex) {
+                Debug.LogError("Error reopening Bluetooth port: " + ex.Message);
             }
         }
-    }
 
-    void Jump(){
-        isJumping = true;
-        charModel.GetComponent<Animator>().Play("Jump");
-        StartCoroutine(JumpSequence());
-    }
-
-    IEnumerator JumpSequence() {
-        yield return new WaitForSeconds(0.6f);
-        isComingDown = true;
-        yield return new WaitForSeconds(0.611f);
-        isComingDown = false;
-        isJumping = false;
-        charModel.GetComponent<Animator>().Play("Standard Run");
-    }
-
-    IEnumerator Rotate(Quaternion deltaRotation)
-    {
-        Quaternion originalRotation = transform.rotation;
-        Quaternion targetRotation = transform.rotation * deltaRotation;
-
-        for (float t = 0; t < 1; t += Time.deltaTime / rotateDuration)
-        {
-            transform.rotation = Quaternion.Lerp(originalRotation, targetRotation, t);
-            yield return null;
+        // 스레드 재시작
+        if (!isReadingUSB && (usbThread == null || (usbThread != null && !usbThread.IsAlive))) {
+            usbThread = new Thread(ReadUSB);
+            usbThread.Start();
+            isReadingUSB = true;
+            Debug.Log("USB Thread Reopened");
         }
 
-        transform.rotation = targetRotation;
+        if (!isReadingBLT && (bltThread == null || (bltThread != null && !bltThread.IsAlive))) {
+            bltThread = new Thread(ReadBLT);
+            bltThread.Start();
+            isReadingBLT = true;
+            Debug.Log("Bluetooth Thread Reopened");
+        }
     }
-    
+
 }
